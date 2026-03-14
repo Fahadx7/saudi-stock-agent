@@ -1,0 +1,10 @@
+yfinance>=0.2.0
+pandas>=2.0.0
+pandas-ta
+streamlit
+plotly
+numpy
+ta
+scipy
+matplotlib
+streamlit-autorefresh
