@@ -1,9 +1,9 @@
 streamlit
 yfinance
-pandas
-pandas-ta==0.3.14b0
+pandas<2.2.0
+pandas-ta
 plotly
 pytz
 streamlit-autorefresh
 requests
-numpy==1.26.4
+numpy<2.0.0
