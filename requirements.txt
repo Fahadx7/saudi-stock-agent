@@ -3,8 +3,7 @@ yfinance
 pandas
 ta
 plotly
-pytz
-streamlit-autorefresh
-requests
-numpy
 google-genai
+streamlit-autorefresh
+numpy
+pytz
