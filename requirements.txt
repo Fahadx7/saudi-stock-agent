@@ -1,0 +1,10 @@
+streamlit
+yfinance
+pandas
+ta
+plotly
+pytz
+streamlit-autorefresh
+requests
+numpy
+google-generativeai>=0.7.2
