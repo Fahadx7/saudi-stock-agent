@@ -41,7 +41,7 @@
                 try {
                     const response = await fetch(`${API_URL}?symbols=${SAUDI_STOCKS.join(",")}`);
                     const data = await response.json();
-                    
+                    const response = await fetch(API_URL); // طلب مباشر للـ Worker
                     if (data?.quoteResponse?.result) {
                         // ترتيب الأسهم: الأعلى ارتفاعاً في الأعلى
                         const sorted = data.quoteResponse.result.sort((a, b) => 
