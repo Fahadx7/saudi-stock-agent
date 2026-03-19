@@ -1,76 +1,72 @@
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>تريند — منصة الأسهم السعودية الذكية</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0B0F1E;--card:#131829;--border:#1E2540;--accent:#00C8FF;--green:#00E676;--red:#FF5252;--text:#FFF;--muted:#7B8AB8}
-body{font-family:sans-serif;background:var(--bg);color:var(--text);direction:rtl}
-.header{background:var(--card);padding:15px;border-bottom:1px solid var(--border);text-align:center}
-.logo{font-size:24px;font-weight:bold;color:var(--accent)}
-.container{padding:20px;max-width:800px;margin:0 auto}
-.card{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:15px;margin-bottom:15px}
-.stock-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
-.green{color:var(--green)}.red{color:var(--red)}
-.refresh-btn{background:var(--accent);border:none;padding:10px 20px;border-radius:8px;color:#000;font-weight:bold;cursor:pointer;width:100%}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تريند — منصة الأسهم السعودية</title>
+    <style>
+        /* التنسيقات السابقة التي أحببتها */
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--bg:#0B0F1E;--card:#131829;--border:#1E2540;--accent:#00C8FF;--green:#00E676;--red:#FF5252;--text:#FFF;--muted:#7B8AB8}
+        body{font-family:sans-serif;background:var(--bg);color:var(--text);direction:rtl;padding:20px}
+        .container{max-width:800px;margin:0 auto}
+        .card{background:var(--card);border:1px solid var(--border);padding:15px;border-radius:12px;margin-bottom:10px}
+        .stock-row{display:flex;justify-content:space-between;align-items:center}
+        .green{color:var(--green)} .red{color:var(--red)}
+        .refresh-btn{background:var(--accent);border:none;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;margin-bottom:20px}
+    </style>
 </head>
 <body>
-<div id="root"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script>
-const e=React.createElement,{useState,useEffect}=React;
+    <div id="root"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script>
+        const e = React.createElement, { useState, useEffect } = React;
 
-// الرابط الخاص بك مدمج هنا تلقائياً
-const API_URL = "https://trend-api.fhdal7rby77.workers.dev";
+        // قائمة الرموز الشاملة (أضفنا أهم الشركات هنا)
+        const SAUDI_STOCKS = [
+            "1120.SR", "2222.SR", "2010.SR", "1150.SR", "1180.SR", "7010.SR", 
+            "1060.SR", "2350.SR", "1211.SR", "5110.SR", "2080.SR", "4190.SR"
+        ];
 
-function App() {
-  const [stocks, setStocks] = useState([]);
-  const [loading, setLoading] = useState(false);
+        const API_URL = "https://trend-api.fhdal7rby77.workers.dev";
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(API_URL);
-      const data = await response.json();
-      if (data?.quoteResponse?.result) {
-        setStocks(data.quoteResponse.result);
-      }
-    } catch (err) {
-      console.error("خطأ في جلب البيانات:", err);
-    }
-    setLoading(false);
-  };
+        function App() {
+            const [stocks, setStocks] = useState([]);
+            const [loading, setLoading] = useState(false);
 
-  useEffect(() => { fetchData(); }, []);
+            const fetchData = async () => {
+                setLoading(true);
+                try {
+                    // هنا نقوم بدمج القائمة في الطلب المرسل للـ Worker
+                    const response = await fetch(`${API_URL}?symbols=${SAUDI_STOCKS.join(",")}`);
+                    const data = await response.json();
+                    if (data?.quoteResponse?.result) {
+                        setStocks(data.quoteResponse.result);
+                    }
+                } catch (err) { console.error("خطأ:", err); }
+                setLoading(false);
+            };
 
-  return e("div", null,
-    e("div", {className: "header"}, e("div", {className: "logo"}, "تريند Trend")),
-    e("div", {className: "container"},
-      e("button", {className: "refresh-btn", onClick: fetchData, disabled: loading}, 
-        loading ? "جاري التحديث..." : "تحديث البيانات الآن 🔄"),
-      e("div", {style: {marginTop: '20px'}},
-        stocks.length === 0 ? e("p", {style: {textAlign:'center'}}, "جاري تحميل الأسهم...") :
-        stocks.map(s => e("div", {className: "card", key: s.symbol},
-          e("div", {className: "stock-row"},
-            e("div", null, e("b", null, s.shortName || s.symbol), e("div", {style:{fontSize:'12px', color:'#7B8AB8'}}, s.symbol)),
-            e("div", {style:{textAlign:'left'}}, 
-              e("div", null, s.regularMarketPrice.toFixed(2)),
-              e("div", {className: s.regularMarketChangePercent >= 0 ? "green" : "red"}, 
-                (s.regularMarketChangePercent >= 0 ? "+" : "") + s.regularMarketChangePercent.toFixed(2) + "%")
-            )
-          )
-        ))
-      )
-    )
-  );
-}
+            useEffect(() => { fetchData(); }, []);
 
-const root=ReactDOM.createRoot(document.getElementById("root"));
-root.render(e(App));
-</script>
+            return e("div", { className: "container" },
+                e("button", { className: "refresh-btn", onClick: fetchData }, loading ? "جاري التحميل..." : "تحديث الأسعار 🔄"),
+                stocks.map(s => e("div", { className: "card", key: s.symbol },
+                    e("div", { className: "stock-row" },
+                        e("div", null, e("b", null, s.shortName || s.symbol), e("div", {style:{color:'var(--muted)', fontSize:'12px'}}, s.symbol)),
+                        e("div", {style:{textAlign:'left'}}, 
+                            e("div", null, s.regularMarketPrice?.toFixed(2)),
+                            e("div", {className: s.regularMarketChangePercent >= 0 ? "green" : "red"}, 
+                                (s.regularMarketChangePercent >= 0 ? "+" : "") + s.regularMarketChangePercent?.toFixed(2) + "%")
+                        )
+                    )
+                ))
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(e(App));
+    </script>
 </body>
 </html>
