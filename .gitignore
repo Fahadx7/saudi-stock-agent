@@ -1,6 +1,0 @@
-.streamlit/secrets.toml
-.vscode/
-__pycache__/
-*.pyc
-*.log
-.DS_Store
