@@ -70,3 +70,11 @@
     </script>
 </body>
 </html>
+// داخل دالة fetchData، يمكنك تحسين معالجة البيانات هكذا:
+if (data?.quoteResponse?.result) {
+    // ترتيب الأسهم بحيث يظهر الأكبر ارتفاعاً في الأعلى
+    const sortedStocks = data.quoteResponse.result.sort((a, b) => 
+        b.regularMarketChangePercent - a.regularMarketChangePercent
+    );
+    setStocks(sortedStocks);
+}
