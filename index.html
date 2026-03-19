@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تريند — منصة الأسهم السعودية</title>
     <style>
-        /* التنسيقات السابقة التي أحببتها */
+        /* التنسيقات العامة */
         *{margin:0;padding:0;box-sizing:border-box}
         :root{--bg:#0B0F1E;--card:#131829;--border:#1E2540;--accent:#00C8FF;--green:#00E676;--red:#FF5252;--text:#FFF;--muted:#7B8AB8}
         body{font-family:sans-serif;background:var(--bg);color:var(--text);direction:rtl;padding:20px}
@@ -13,23 +13,24 @@
         .card{background:var(--card);border:1px solid var(--border);padding:15px;border-radius:12px;margin-bottom:10px}
         .stock-row{display:flex;justify-content:space-between;align-items:center}
         .green{color:var(--green)} .red{color:var(--red)}
-        .refresh-btn{background:var(--accent);border:none;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;margin-bottom:20px}
+        .refresh-btn{background:var(--accent);border:none;padding:12px;border-radius:8px;font-weight:bold;width:100%;cursor:pointer;margin-bottom:20px;color:#000}
+        .loading-text{text-align:center;color:var(--muted);margin-top:20px}
     </style>
 </head>
 <body>
     <div id="root"></div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+
     <script>
         const e = React.createElement, { useState, useEffect } = React;
 
-        // قائمة الرموز الشاملة (أضفنا أهم الشركات هنا)
-        const SAUDI_STOCKS = [
-            "1120.SR", "2222.SR", "2010.SR", "1150.SR", "1180.SR", "7010.SR", 
-            "1060.SR", "2350.SR", "1211.SR", "5110.SR", "2080.SR", "4190.SR"
-        ];
-
+        // 1. رابط الـ Worker الخاص بك
         const API_URL = "https://saudi-data-api.aboamran2013.workers.dev";
+
+        // 2. قائمة الرموز التي نريد جلبها
+        const SAUDI_STOCKS = ["1120.SR", "2222.SR", "2010.SR", "1150.SR", "7010.SR", "1180.SR"];
 
         function App() {
             const [stocks, setStocks] = useState([]);
@@ -38,27 +39,41 @@
             const fetchData = async () => {
                 setLoading(true);
                 try {
-                    // هنا نقوم بدمج القائمة في الطلب المرسل للـ Worker
                     const response = await fetch(`${API_URL}?symbols=${SAUDI_STOCKS.join(",")}`);
                     const data = await response.json();
+                    
                     if (data?.quoteResponse?.result) {
-                        setStocks(data.quoteResponse.result);
+                        // ترتيب الأسهم: الأعلى ارتفاعاً في الأعلى
+                        const sorted = data.quoteResponse.result.sort((a, b) => 
+                            (b.regularMarketChangePercent || 0) - (a.regularMarketChangePercent || 0)
+                        );
+                        setStocks(sorted);
                     }
-                } catch (err) { console.error("خطأ:", err); }
+                } catch (err) {
+                    console.error("خطأ في جلب البيانات:", err);
+                }
                 setLoading(false);
             };
 
+            // جلب البيانات عند فتح الصفحة لأول مرة
             useEffect(() => { fetchData(); }, []);
 
             return e("div", { className: "container" },
-                e("button", { className: "refresh-btn", onClick: fetchData }, loading ? "جاري التحميل..." : "تحديث الأسعار 🔄"),
+                e("button", { className: "refresh-btn", onClick: fetchData }, 
+                    loading ? "جاري التحديث... ⏳" : "تحديث الأسعار 🔄"
+                ),
+                loading && stocks.length === 0 ? e("div", {className: "loading-text"}, "جاري الاتصال بالسوق...") : 
                 stocks.map(s => e("div", { className: "card", key: s.symbol },
                     e("div", { className: "stock-row" },
-                        e("div", null, e("b", null, s.shortName || s.symbol), e("div", {style:{color:'var(--muted)', fontSize:'12px'}}, s.symbol)),
+                        e("div", null, 
+                            e("b", null, s.shortName || s.symbol), 
+                            e("div", {style:{color:'var(--muted)', fontSize:'12px'}}, s.symbol)
+                        ),
                         e("div", {style:{textAlign:'left'}}, 
-                            e("div", null, s.regularMarketPrice?.toFixed(2)),
+                            e("div", {style:{fontWeight:'bold'}}, s.regularMarketPrice?.toFixed(2)),
                             e("div", {className: s.regularMarketChangePercent >= 0 ? "green" : "red"}, 
-                                (s.regularMarketChangePercent >= 0 ? "+" : "") + s.regularMarketChangePercent?.toFixed(2) + "%")
+                                (s.regularMarketChangePercent >= 0 ? "+" : "") + s.regularMarketChangePercent?.toFixed(2) + "%"
+                            )
                         )
                     )
                 ))
@@ -70,11 +85,3 @@
     </script>
 </body>
 </html>
-// داخل دالة fetchData، يمكنك تحسين معالجة البيانات هكذا:
-if (data?.quoteResponse?.result) {
-    // ترتيب الأسهم بحيث يظهر الأكبر ارتفاعاً في الأعلى
-    const sortedStocks = data.quoteResponse.result.sort((a, b) => 
-        b.regularMarketChangePercent - a.regularMarketChangePercent
-    );
-    setStocks(sortedStocks);
-}
