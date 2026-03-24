@@ -1,0 +1,173 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ═══════════════════════════════════════════════════════════════
+    // Helper Functions
+    // ═══════════════════════════════════════════════════════════════
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ✅ FIX: إزالة البريد الإلكتروني الشخصي المضمّن (security risk)
+    // لتعيين مدير: استخدم Firebase Console أو Admin SDK لتحديث حقل role في مستند المستخدم
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.size() >= 3 &&
+        email.size() <= 320 &&
+        email.matches('^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Domain Validators
+    // ═══════════════════════════════════════════════════════════════
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'photoURL', 'role', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['admin', 'user'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidWatchlist(data) {
+      return hasOnlyAllowedFields(['userId', 'symbol', 'addedAt']) &&
+             data.userId == request.auth.uid &&
+             data.symbol is string &&
+             data.symbol.size() > 0 &&
+             data.symbol.size() <= 20 &&
+             data.addedAt is timestamp;
+    }
+
+    function isValidFeedback(data) {
+      return hasOnlyAllowedFields(['userId', 'name', 'email', 'type', 'message', 'createdAt']) &&
+             data.type in ['تحسين', 'خطأ', 'ميزة', 'أخرى'] &&
+             data.message is string &&
+             data.message.size() > 0 &&
+             data.message.size() <= 5000 &&
+             data.createdAt is timestamp &&
+             (!('email' in data) || isValidEmail(data.email)) &&
+             (!('name' in data) || (data.name is string && data.name.size() <= 100));
+    }
+
+    function isValidMarginAccount(data) {
+      return hasOnlyAllowedFields(['userId', 'balance', 'equity', 'marginUsed', 'maintenanceMargin', 'updatedAt']) &&
+             data.userId == request.auth.uid &&
+             data.balance is number && data.balance >= 0 &&
+             data.equity is number &&
+             data.marginUsed is number && data.marginUsed >= 0;
+    }
+
+    function isValidMarginPosition(data) {
+      return hasOnlyAllowedFields(['userId', 'symbol', 'quantity', 'entryPrice', 'currentPrice', 'leverage', 'marginRequired', 'status', 'openedAt', 'closedAt']) &&
+             data.userId == request.auth.uid &&
+             data.symbol is string && data.symbol.size() > 0 && data.symbol.size() <= 20 &&
+             data.quantity is number && data.quantity > 0 &&
+             data.entryPrice is number && data.entryPrice > 0 &&
+             data.status in ['open', 'closed'] &&
+             data.openedAt is timestamp;
+    }
+
+    function isValidCustomAlert(data) {
+      return hasOnlyAllowedFields(['id', 'symbol', 'targetPrice', 'targetRsi', 'triggered', 'createdAt', 'userId']) &&
+             data.symbol is string && data.symbol.size() > 0 && data.symbol.size() <= 20 &&
+             data.triggered is bool &&
+             data.createdAt is string;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Collections
+    // ═══════════════════════════════════════════════════════════════
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) &&
+                       isValidUser(request.resource.data) &&
+                       // ✅ لا يمكن للمستخدم الجديد تعيين نفسه admin
+                       request.resource.data.role == 'user';
+      allow update: if (isOwner(userId) &&
+                        isValidUser(request.resource.data) &&
+                        // ✅ لا يمكن تغيير الـ role إلا من قِبل Admin
+                        request.resource.data.role == resource.data.role) ||
+                       isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /watchlists/{watchlistId} {
+      allow read: if isAuthenticated() &&
+                     (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidWatchlist(request.resource.data);
+      // Watchlist items غير قابلة للتعديل — احذف وأنشئ من جديد
+      allow update: if false;
+      allow delete: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /feedback/{feedbackId} {
+      // ✅ Feedback يُكتب من Server (Admin SDK) فقط — القراءة للمدير فقط
+      allow read: if isAdmin();
+      // السماح بالكتابة من Server عبر Admin SDK (تجاوز الـ rules)
+      // أو من المستخدم المصادق عليه مباشرة
+      allow create: if isValidFeedback(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    match /margin_accounts/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidMarginAccount(request.resource.data);
+      allow update: if (isOwner(userId) && isValidMarginAccount(request.resource.data)) ||
+                       isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /margin_positions/{positionId} {
+      allow read: if isAuthenticated() &&
+                     (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidMarginPosition(request.resource.data);
+      allow update: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin()) &&
+                       isValidMarginPosition(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Collections الجديدة (يكتبها Server فقط عبر Admin SDK)
+    // ═══════════════════════════════════════════════════════════════
+
+    // الصفقات المفتوحة — يديرها الـ Server فقط
+    match /active_trades/{symbol} {
+      allow read: if isAdmin();
+      // الكتابة عبر Admin SDK فقط (يتجاوز الـ rules تلقائياً)
+      allow write: if false;
+    }
+
+    // التنبيهات المخصصة
+    match /custom_alerts/{alertId} {
+      allow read: if isAuthenticated() &&
+                     (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidCustomAlert(request.resource.data);
+      // ✅ المستخدم يمكنه فقط تحديث triggered إلى false→true (لا يمكن إعادة تفعيله)
+      allow update: if (isAuthenticated() && resource.data.userId == request.auth.uid &&
+                        request.resource.data.triggered == true &&
+                        resource.data.triggered == false) ||
+                       isAdmin();
+      allow delete: if isAuthenticated() &&
+                       (resource.data.userId == request.auth.uid || isAdmin());
+    }
+  }
+}
